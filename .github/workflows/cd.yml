@@ -28,8 +28,8 @@ jobs:
     env:
       # Fallback de região se o secret não estiver definido
       AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
-      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      ECR_REPO_BACKEND: ${{ secrets.ECR_REPO_BACKEND }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID || '058264220517' }}
+      ECR_REPO_BACKEND: ${{ secrets.ECR_REPO_BACKEND || 'devops-study-backend'}}
     steps:
       # Passo 1: Checkout do código
       - uses: actions/checkout@v4
