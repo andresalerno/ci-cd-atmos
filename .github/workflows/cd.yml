@@ -150,7 +150,7 @@ jobs:
           aws s3 sync ./frontend/dist/ s3://${{ steps.tfout.outputs.bucket }} --delete
 
       # Passo 14: Invalidate CloudFront cache
-      - name: Invalidate CloudFront cache
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        run: |
-          aws cloudfront create-invalidation --distribution-id "${{ steps.tfout.outputs.cf_id }}" --paths "/*"
+      # - name: Invalidate CloudFront cache
+      #  if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      #  run: |
+      #    aws cloudfront create-invalidation --distribution-id "${{ steps.tfout.outputs.cf_id }}" --paths "/*"
