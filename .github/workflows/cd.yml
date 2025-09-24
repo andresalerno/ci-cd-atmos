@@ -25,6 +25,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: atmos
     env:
       # Fallback de região se o secret não estiver definido
       AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
