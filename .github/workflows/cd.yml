@@ -2,47 +2,123 @@ name: CD
 
 on:
   workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply Terraform and deploy (manual run)"
+        type: boolean
+        default: false
+        required: false
+      build_backend_image:
+        description: "Build & Push backend image (manual run)"
+        type: boolean
+        default: false
+        required: false
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*.*.*'  # Aciona o deploy quando uma nova tag com formato vX.Y.Z for criada
 
 permissions:
-  id-token: write   # necessário para OIDC
-  contents: read
+  contents: read  # Permissões para acessar os conteúdos do repositório
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      # Passo 1: Checkout do código
       - uses: actions/checkout@v4
+        name: Checkout code
 
-      # Configurar credenciais AWS via OIDC (recomendado)
-      # Pré-requisito: criar Role com trust policy para GitHub
-      # - uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
-      #     aws-region: ${{ vars.AWS_REGION }}
+      # Passo 2: Configurar as credenciais AWS com Access Key ID e Secret Access Key
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Use o Access Key ID armazenado no GitHub Secrets
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use o Secret Access Key armazenado no GitHub Secrets
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # Login no ECR, build e push da imagem do backend
-      # - name: Login ECR
-      #   uses: aws-actions/amazon-ecr-login@v2
-      # - name: Build & Push Backend
-      #   run: |
-      #     docker build -t ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPO_BACKEND }}:latest ./backend
-      #     docker push ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPO_BACKEND }}:latest
+      # Passo 3: Login no Amazon ECR
+      - name: Login to Amazon ECR
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_backend_image == 'true')
+        uses: aws-actions/amazon-ecr-login@v2
 
-      # Terraform plan/apply (infra/terraform)
-      # - name: Setup Terraform
-      #   uses: hashicorp/setup-terraform@v3
-      # - name: Terraform Init/Plan
-      #   working-directory: infra/terraform
-      #   run: |
-      #     terraform init -input=false
-      #     terraform plan -input=false -out=tfplan
-      # - name: Terraform Apply (manual/condicional)
-      #   if: startsWith(github.ref, 'refs/tags/v')
-      #   working-directory: infra/terraform
-      #   run: terraform apply -input=false -auto-approve tfplan
+      # Garante que o repositório do ECR existe
+      - name: Ensure ECR repository exists
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_backend_image == 'true')
+        run: |
+          aws ecr describe-repositories --repository-names "${{ secrets.ECR_REPO_BACKEND }}" >/dev/null 2>&1 \
+            || aws ecr create-repository --repository-name "${{ secrets.ECR_REPO_BACKEND }}"
 
-      # Deploy ECS e Upload do frontend para S3 ficariam aqui.
+      # Passo 4: Build & Push Backend para o ECR
+      - name: Build & Push Backend to ECR
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_backend_image == 'true')
+        run: |
+          IMAGE_REPO="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_BACKEND }}"
+          IMAGE_TAG="${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}"
+          docker build -t "$IMAGE_REPO:latest" -t "$IMAGE_REPO:$IMAGE_TAG" ./backend
+          docker push "$IMAGE_REPO:latest"
+          docker push "$IMAGE_REPO:$IMAGE_TAG"
 
+      # Passo 5: Terraform (se necessário, caso queira gerenciar a infraestrutura via Terraform)
+      # Configuração do Terraform para aplicar a infraestrutura (caso tenha)
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init/Plan
+        working-directory: infra/terraform
+        env:
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_container_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_BACKEND }}:latest
+        run: |
+          terraform init -input=false
+          terraform plan -input=false -out=tfplan
+
+      # Passo 6: Aplicar Terraform (gerenciar infraestrutura como código)
+      - name: Terraform Apply (manual/condicional)
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true')
+        working-directory: infra/terraform
+        env:
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_container_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_BACKEND }}:latest
+        run: terraform apply -input=false -auto-approve tfplan
+
+      # Ler outputs do Terraform (após apply) e realizar deploy
+      - name: Read Terraform outputs
+        id: tfout
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true')
+        working-directory: infra/terraform
+        run: |
+          echo "bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
+          echo "cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
+          echo "service=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
+          echo "cf_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+          echo "cf_domain=$(terraform output -raw cloudfront_domain_name)" >> $GITHUB_OUTPUT
+
+      - name: Deploy ECS service
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true')
+        run: |
+          aws ecs update-service --cluster "${{ steps.tfout.outputs.cluster }}" --service "${{ steps.tfout.outputs.service }}" --force-new-deployment
+
+      - name: Setup Node (frontend build)
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true')
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Build frontend
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true')
+        working-directory: frontend
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
+          npm run build
+
+      - name: Upload Frontend to S3
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true')
+        run: |
+          aws s3 sync ./frontend/dist/ s3://${{ steps.tfout.outputs.bucket }} --delete
+
+      - name: Invalidate CloudFront cache
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true')
+        run: |
+          aws cloudfront create-invalidation --distribution-id "${{ steps.tfout.outputs.cf_id }}" --paths "/*"

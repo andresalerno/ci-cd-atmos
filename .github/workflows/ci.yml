@@ -34,7 +34,7 @@ jobs:
       # Passo 3: Instalar dependências
       - name: Install
         run: |
-          npm ci || npm i  # Tenta rodar 'npm ci' para instalações limpas, senão roda 'npm install'
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
 
       # Passo 4: Rodar Lint (verificação de qualidade de código)
       - name: Lint
@@ -59,7 +59,7 @@ jobs:
 
       - name: Install
         run: |
-          npm ci || npm i
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
 
       # Passo 2: Rodar os testes
       - name: Test
@@ -84,7 +84,7 @@ jobs:
 
       - name: Install
         run: |
-          npm ci || npm i
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
 
       # Passo 3: Build (Noop aqui, pode ser ajustado para um verdadeiro build)
       - name: Build (noop for backend)
@@ -109,7 +109,7 @@ jobs:
 
       - name: Install
         run: |
-          npm ci || npm i
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
 
       # Passo 4: Rodar Lint no frontend
       - name: Lint
@@ -134,7 +134,7 @@ jobs:
 
       - name: Install
         run: |
-          npm ci || npm i
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
 
       # Passo 5: Rodar Testes no frontend
       - name: Test
@@ -159,7 +159,7 @@ jobs:
 
       - name: Install
         run: |
-          npm ci || npm i
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
 
       # Passo 6: Build do frontend
       - name: Build
