@@ -25,6 +25,11 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      # Fallback de região se o secret não estiver definido
+      AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_REPO_BACKEND: ${{ secrets.ECR_REPO_BACKEND }}
     steps:
       # Passo 1: Checkout do código
       - uses: actions/checkout@v4
@@ -36,25 +41,39 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Use o Access Key ID armazenado no GitHub Secrets
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use o Secret Access Key armazenado no GitHub Secrets
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+      - name: Verify AWS identity and region
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "Error: AWS credentials are not properly configured in repository secrets"
+            echo "Please add the following secrets to your repository:"
+            echo "- AWS_ACCESS_KEY_ID"
+            echo "- AWS_SECRET_ACCESS_KEY"
+            echo "- AWS_REGION"
+            echo "- AWS_ACCOUNT_ID"
+            echo "- ECR_REPO_BACKEND"
+            exit 1
+          fi
+          echo "AWS_REGION=$AWS_REGION"
+          aws sts get-caller-identity
 
       # Passo 3: Login no Amazon ECR
       - name: Login to Amazon ECR
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_backend_image == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         uses: aws-actions/amazon-ecr-login@v2
-
       # Garante que o repositório do ECR existe
       - name: Ensure ECR repository exists
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_backend_image == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: |
-          aws ecr describe-repositories --repository-names "${{ secrets.ECR_REPO_BACKEND }}" >/dev/null 2>&1 \
-            || aws ecr create-repository --repository-name "${{ secrets.ECR_REPO_BACKEND }}"
+          aws ecr describe-repositories --repository-names "$ECR_REPO_BACKEND" >/dev/null 2>&1 \
+            || aws ecr create-repository --repository-name "$ECR_REPO_BACKEND"
 
       # Passo 4: Build & Push Backend para o ECR #
       - name: Build & Push Backend to ECR
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_backend_image == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: |
-          IMAGE_REPO="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_BACKEND }}"
+          IMAGE_REPO="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_BACKEND"
           IMAGE_TAG="${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}"
           docker build -t "$IMAGE_REPO:latest" -t "$IMAGE_REPO:$IMAGE_TAG" ./backend
           docker push "$IMAGE_REPO:latest"
@@ -68,8 +87,8 @@ jobs:
       - name: Terraform Init/Plan
         working-directory: infra/terraform
         env:
-          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-          TF_VAR_container_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_BACKEND }}:latest
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_container_image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_BACKEND }}:latest
         run: |
           terraform init -input=false
           terraform plan -input=false -out=tfplan
@@ -79,8 +98,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         working-directory: infra/terraform
         env:
-          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-          TF_VAR_container_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_BACKEND }}:latest
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_container_image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_BACKEND }}:latest
         run: terraform apply -input=false -auto-approve tfplan
 
       # Ler outputs do Terraform (após apply) e realizar deploy
