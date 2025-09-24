@@ -175,3 +175,12 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'  # Ativa cache para dependências npm
+
+      # Adicionando caching para npm (dependências) para otimizar o tempo de execução
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm  # Caminho do cache npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}  # Geração de chave para o cache
+          restore-keys: |
+            ${{ runner.os }}-npm-
