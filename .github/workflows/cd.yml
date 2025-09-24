@@ -17,7 +17,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*.*.*'  # Aciona o deploy quando uma nova tag com formato vX.Y.Z for criada
+      - 'v*.*.*'
 
 permissions:
   contents: read  # Permissões para acessar os conteúdos do repositório
@@ -27,7 +27,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: atmos  # Definir o environment para acesso aos secrets
     env:
-      # Fallback de região se o secret não estiver definido
       AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID || '058264220517' }}
       ECR_REPO_BACKEND: ${{ secrets.ECR_REPO_BACKEND || 'devops-study-backend' }}
@@ -36,11 +35,12 @@ jobs:
       - uses: actions/checkout@v4
         name: Checkout code
 
-      - name: Preflight secrets check
+      # Passo 2: Verificação dos secrets
+      - name: Verify AWS secrets
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}  # Adicionando o session token
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           ECR_REPO_BACKEND: ${{ secrets.ECR_REPO_BACKEND }}
@@ -48,11 +48,11 @@ jobs:
           missing=0
           if [ -z "${AWS_ACCESS_KEY_ID}" ]; then echo "::error::Missing secret AWS_ACCESS_KEY_ID"; missing=1; fi
           if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then echo "::error::Missing secret AWS_SECRET_ACCESS_KEY"; missing=1; fi
-          if [ -z "${AWS_SESSION_TOKEN}" ]; then echo "::error::Missing secret AWS_SESSION_TOKEN"; missing=1; fi  # Verificação do token de sessão
+          if [ -z "${AWS_SESSION_TOKEN}" ]; then echo "::error::Missing secret AWS_SESSION_TOKEN"; missing=1; fi
           if [ -z "${AWS_REGION}" ]; then echo "::warning::Missing AWS_REGION; defaulting to us-east-1"; fi
           if [ -z "${AWS_ACCOUNT_ID}" ]; then echo "::warning::Missing AWS_ACCOUNT_ID (required for ECR build/push)"; fi
           if [ -z "${ECR_REPO_BACKEND}" ]; then echo "::warning::Missing ECR_REPO_BACKEND (required for ECR build/push)"; fi
-          test "$missing" -eq 0  # Verifica se todos os secrets estão configurados corretamente
+          test "$missing" -eq 0
 
       # Passo 3: Configurar as credenciais AWS com Access Key ID, Secret Access Key e Session Token
       - name: Configure AWS credentials with session token
@@ -60,25 +60,22 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}  # Incluindo o session token aqui
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
           mask-aws-account-id: true
 
       # Passo 4: Login no Amazon ECR
       - name: Login to Amazon ECR
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_backend_image == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         uses: aws-actions/amazon-ecr-login@v2
 
       # Passo 5: Garante que o repositório do ECR existe
       - name: Ensure ECR repository exists
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_backend_image == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: |
           aws ecr describe-repositories --repository-names "$ECR_REPO_BACKEND" >/dev/null 2>&1 \
             || aws ecr create-repository --repository-name "$ECR_REPO_BACKEND"
 
       # Passo 6: Build & Push Backend para o ECR
       - name: Build & Push Backend to ECR
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_backend_image == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: |
           IMAGE_REPO="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_BACKEND"
           IMAGE_TAG="${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}"
@@ -86,7 +83,7 @@ jobs:
           docker push "$IMAGE_REPO:latest"
           docker push "$IMAGE_REPO:$IMAGE_TAG"
 
-      # Passo 7: Configuração do Terraform (se necessário)
+      # Passo 7: Terraform Setup (sem criar novos roles)
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -99,7 +96,7 @@ jobs:
           terraform init -input=false
           terraform plan -input=false -out=tfplan
 
-      # Passo 8: Aplicar Terraform (gerenciar infraestrutura como código)
+      # Passo 8: Aplicar Terraform (sem criar IAM roles)
       - name: Terraform Apply (manual/condicional)
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         working-directory: infra/terraform
@@ -111,24 +108,18 @@ jobs:
       # Passo 9: Ler outputs do Terraform e realizar deploy
       - name: Read Terraform outputs
         id: tfout
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        working-directory: infra/terraform
         run: |
           echo "bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
           echo "cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
           echo "service=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
-          echo "cf_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
-          echo "cf_domain=$(terraform output -raw cloudfront_domain_name)" >> $GITHUB_OUTPUT
 
       # Passo 10: Deploy ECS service
       - name: Deploy ECS service
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: |
           aws ecs update-service --cluster "${{ steps.tfout.outputs.cluster }}" --service "${{ steps.tfout.outputs.service }}" --force-new-deployment
 
       # Passo 11: Setup Node (frontend build)
       - name: Setup Node (frontend build)
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         uses: actions/setup-node@v4
         with:
           node-version: 18
@@ -137,7 +128,6 @@ jobs:
 
       # Passo 12: Build frontend
       - name: Build frontend
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         working-directory: frontend
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm i; fi
@@ -145,12 +135,5 @@ jobs:
 
       # Passo 13: Upload Frontend to S3
       - name: Upload Frontend to S3
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: |
           aws s3 sync ./frontend/dist/ s3://${{ steps.tfout.outputs.bucket }} --delete
-
-      # Passo 14: Invalidate CloudFront cache
-      # - name: Invalidate CloudFront cache
-      #  if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-      #  run: |
-      #    aws cloudfront create-invalidation --distribution-id "${{ steps.tfout.outputs.cf_id }}" --paths "/*"
