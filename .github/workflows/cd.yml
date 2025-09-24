@@ -37,18 +37,18 @@ jobs:
 
       - name: Preflight secrets check
         env:
-          S_AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          S_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          S_AWS_REGION: ${{ secrets.AWS_REGION }}
-          S_AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          S_ECR_REPO_BACKEND: ${{ secrets.ECR_REPO_BACKEND }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          ECR_REPO_BACKEND: ${{ secrets.ECR_REPO_BACKEND }}
         run: |
           missing=0
-          if [ -z "${S_AWS_ACCESS_KEY_ID}" ]; then echo "::error::Missing secret AWS_ACCESS_KEY_ID"; missing=1; fi
-          if [ -z "${S_AWS_SECRET_ACCESS_KEY}" ]; then echo "::error::Missing secret AWS_SECRET_ACCESS_KEY"; missing=1; fi
-          if [ -z "${S_AWS_REGION}" ]; then echo "::warning::Missing AWS_REGION; defaulting to us-east-1"; fi
-          if [ -z "${S_AWS_ACCOUNT_ID}" ]; then echo "::warning::Missing AWS_ACCOUNT_ID (required for ECR build/push)"; fi
-          if [ -z "${S_ECR_REPO_BACKEND}" ]; then echo "::warning::Missing ECR_REPO_BACKEND (required for ECR build/push)"; fi
+          if [ -z "${AWS_ACCESS_KEY_ID}" ]; then echo "::error::Missing secret AWS_ACCESS_KEY_ID"; missing=1; fi
+          if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then echo "::error::Missing secret AWS_SECRET_ACCESS_KEY"; missing=1; fi
+          if [ -z "${AWS_REGION}" ]; then echo "::warning::Missing AWS_REGION; defaulting to us-east-1"; fi
+          if [ -z "${AWS_ACCOUNT_ID}" ]; then echo "::warning::Missing AWS_ACCOUNT_ID (required for ECR build/push)"; fi
+          if [ -z "${ECR_REPO_BACKEND}" ]; then echo "::warning::Missing ECR_REPO_BACKEND (required for ECR build/push)"; fi
           test "$missing" -eq 0
 
       # Passo 2: Configurar as credenciais AWS com Access Key ID e Secret Access Key
