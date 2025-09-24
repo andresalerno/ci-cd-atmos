@@ -8,6 +8,8 @@ on:
   pull_request:
     branches:
       - main  # Executa quando há pull request para a branch principal (main)
+  # Permite disparar manualmente pelo UI do GitHub
+  workflow_dispatch:
 
 jobs:
   # Job de Linting para o Backend
@@ -27,7 +29,7 @@ jobs:
         with:
           node-version: 18  # Define a versão do Node.js
           cache: 'npm'  # Ativa cache para dependências npm
-          cache-dependency-path: backend/package-lock.json  # Define o caminho para o cache das dependências
+          cache-dependency-path: backend/package.json  # Usa arquivo existente para chave do cache
 
       # Passo 3: Instalar dependências
       - name: Install
@@ -53,7 +55,7 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: backend/package.json
 
       - name: Install
         run: |
@@ -78,7 +80,7 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: backend/package.json
 
       - name: Install
         run: |
@@ -103,7 +105,7 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: frontend/package.json
 
       - name: Install
         run: |
@@ -128,7 +130,7 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: frontend/package.json
 
       - name: Install
         run: |
@@ -153,7 +155,7 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: frontend/package.json
 
       - name: Install
         run: |
@@ -162,25 +164,3 @@ jobs:
       # Passo 6: Build do frontend
       - name: Build
         run: npm run build
-
-  # Job de Configuração de Cache para npm (Otimização para dependências npm)
-  cache-setup:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        name: Checkout code
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'npm'  # Ativa cache para dependências npm
-
-      # Adicionando caching para npm (dependências) para otimizar o tempo de execução
-      - name: Cache npm dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm  # Caminho do cache npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}  # Geração de chave para o cache
-          restore-keys: |
-            ${{ runner.os }}-npm-
