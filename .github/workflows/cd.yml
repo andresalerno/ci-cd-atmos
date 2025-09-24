@@ -49,19 +49,18 @@ jobs:
           missing=0
           if [ -z "${AWS_ACCESS_KEY_ID}" ]; then echo "::error::Missing secret AWS_ACCESS_KEY_ID"; missing=1; fi
           if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then echo "::error::Missing secret AWS_SECRET_ACCESS_KEY"; missing=1; fi
-          if [ -z "${AWS_SESSION_TOKEN}" ]; then echo "::error::Missing secret AWS_SESSION_TOKEN"; missing=1; fi
+          if [ -z "${AWS_SESSION_TOKEN}" ]; then echo "::warning::Missing AWS_SESSION_TOKEN (ok for long-lived keys)"; fi
           if [ -z "${AWS_REGION}" ]; then echo "::warning::Missing AWS_REGION; defaulting to us-east-1"; fi
           if [ -z "${AWS_ACCOUNT_ID}" ]; then echo "::warning::Missing AWS_ACCOUNT_ID (required for ECR build/push)"; fi
           if [ -z "${ECR_REPO_BACKEND}" ]; then echo "::warning::Missing ECR_REPO_BACKEND (required for ECR build/push)"; fi
           test "$missing" -eq 0
 
       # Passo 3: Configurar as credenciais AWS com Access Key ID, Secret Access Key e Session Token
-      - name: Configure AWS credentials with session token
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
           mask-aws-account-id: true
 
@@ -88,36 +87,32 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Terraform Init/Plan
-        working-directory: infra/terraform
+      - name: Terraform Init/Plan (minimal)
+        working-directory: infra/terraform-min
         env:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
-          TF_VAR_container_image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_BACKEND }}:latest
         run: |
           terraform init -input=false
           terraform plan -input=false -out=tfplan
 
       # Passo 8: Aplicar Terraform (sem criar IAM roles)
-      - name: Terraform Apply (manual/condicional)
+      - name: Terraform Apply (minimal)
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        working-directory: infra/terraform
+        working-directory: infra/terraform-min
         env:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
-          TF_VAR_container_image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_BACKEND }}:latest
         run: terraform apply -input=false -auto-approve tfplan
 
       # Passo 9: Ler outputs do Terraform e realizar deploy
-      - name: Read Terraform outputs
+      - name: Read Terraform outputs (minimal)
         id: tfout
+        working-directory: infra/terraform-min
         run: |
           echo "bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
-          echo "cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
-          echo "service=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
+          echo "site=$(terraform output -raw s3_website_endpoint)" >> $GITHUB_OUTPUT
 
       # Passo 10: Deploy ECS service
-      - name: Deploy ECS service
-        run: |
-          aws ecs update-service --cluster "${{ steps.tfout.outputs.cluster }}" --service "${{ steps.tfout.outputs.service }}" --force-new-deployment
+      # (minimal) Sem ECS nesta stack
 
       # Passo 11: Setup Node (frontend build)
       - name: Setup Node (frontend build)
@@ -138,3 +133,7 @@ jobs:
       - name: Upload Frontend to S3
         run: |
           aws s3 sync ./frontend/dist/ s3://${{ steps.tfout.outputs.bucket }} --delete
+
+      - name: Deployment summary
+        run: |
+          echo "Frontend (S3 website): http://${{ steps.tfout.outputs.site }}" >> $GITHUB_STEP_SUMMARY
