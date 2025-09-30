@@ -164,8 +164,8 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: |
-          # Usa npm ci quando houver lockfile, senão npm i
-          if [ -f package-lock.json ]; then npm ci; else npm i; fi
+          # Instalação resiliente: tenta npm ci; se lock estiver desatualizado, cai para npm i
+          if [ -f package-lock.json ]; then npm ci || npm i --no-audit --no-fund; else npm i --no-audit --no-fund; fi
           npm run build
 
       # Passo 13: Publica artefatos do frontend no bucket S3 gerenciado pelo Terraform
