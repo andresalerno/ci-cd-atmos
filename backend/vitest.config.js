@@ -5,11 +5,8 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    // Dois reporters: padrão + JUnit (salvo em reports/junit.xml)
-    reporters: [
-      'default',
-      ['junit', { outputFile: 'reports/junit.xml' }]
-    ],
+    // Reporter padrão; JUnit removido para evitar dependência externa
+    reporters: ['default'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'cobertura'],

@@ -14,20 +14,20 @@ Para histórico de builds (data, hora e status), use a aba `Actions` do GitHub. 
 - Artefato do backend (tar.gz com `src`, `package.json`, `Dockerfile`)
 - Test reports e coverage (se gerados pelos scripts) como artifacts
 
-## Testes e Cobertura (Vitest + JUnit)
+## Testes e Cobertura (Vitest)
 
 - Backend
-  - Config: `backend/vitest.config.js` — reporters `default` + `junit` (XML em `backend/reports/junit.xml`) e cobertura `v8` (`backend/coverage`).
+  - Config: `backend/vitest.config.js` — reporter `default` e cobertura `v8` (`backend/coverage`).
   - Scripts: `npm run test` executa Vitest com cobertura; `npm run lint` roda ESLint.
   - Exemplo de teste: `backend/src/util.test.js`.
 - Frontend
-  - Config: `frontend/vite.config.js` inclui seção `test` do Vitest (reporter `junit`) e `coverage`.
+  - Config: `frontend/vite.config.js` inclui seção `test` do Vitest (reporter `default`) e `coverage`.
   - Scripts: `npm run test` executa Vitest com cobertura; `npm run lint` roda ESLint.
   - Exemplo de teste: `frontend/src/util.test.js`.
 
 No CI, os jobs de teste publicam automaticamente:
-- Relatórios JUnit: `backend/reports/**/*.xml`, `frontend/reports/**/*.xml`
 - Cobertura: `backend/coverage/**`, `frontend/coverage/**`
+  - Observação: Relatórios JUnit foram removidos para evitar dependência externa no reporter. Se desejar JUnit, posso reintroduzir usando um reporter disponível ou recurso nativo do Vitest (se suportado na versão).
 
 ### Badge dinâmico (Data/Hora/Ator)
 - O job `update-readme-meta` atualiza o arquivo `.badges/ci-meta.json` com payload para o Shields.io.

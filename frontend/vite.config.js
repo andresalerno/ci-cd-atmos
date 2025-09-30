@@ -10,10 +10,8 @@ export default defineConfig({
     port: 5173
   },
   test: {
-    reporters: [
-      'default',
-      ['junit', { outputFile: 'reports/junit.xml' }]
-    ],
+    // Reporter padrão; JUnit removido para evitar dependência externa
+    reporters: ['default'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'cobertura'],
