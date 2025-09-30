@@ -46,6 +46,11 @@ jobs:
       ECR_REPO_BACKEND: ${{ secrets.ECR_REPO_BACKEND || 'devops-study-backend' }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
 
+    outputs:
+      site: ${{ steps.tfout.outputs.site }}
+      bucket: ${{ steps.tfout.outputs.bucket }}
+      image_tag: ${{ steps.build_push.outputs.image_tag }}
+
     steps:
       # Passo 1: Checkout do código-fonte
       - uses: actions/checkout@v4
@@ -112,6 +117,7 @@ jobs:
 
       # Passo 6: Build & Push do backend para o ECR
       - name: Build & Push Backend to ECR
+        id: build_push
         run: |
           # Define repositório e tag (usa a tag de git quando existir, senão 'latest')
           IMAGE_REPO="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_BACKEND"
@@ -119,6 +125,7 @@ jobs:
           docker build -t "$IMAGE_REPO:latest" -t "$IMAGE_REPO:$IMAGE_TAG" ./backend
           docker push "$IMAGE_REPO:latest"
           docker push "$IMAGE_REPO:$IMAGE_TAG"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
       # Passo 7: Setup do Terraform (stack mínima; sem criar novos roles IAM)
       - name: Setup Terraform
@@ -181,7 +188,7 @@ jobs:
   cd-update-readme-meta:
     needs:
       - deploy
-    if: github.ref == 'refs/heads/main'
+    if: ${{ always() && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -190,6 +197,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: true
       - name: Update README CD meta and badge
         env:
           RUN_NUMBER: ${{ github.run_number }}
@@ -197,11 +206,16 @@ jobs:
           SHA: ${{ github.sha }}
           REF_NAME: ${{ github.ref_name }}
           RESULT: ${{ needs.deploy.result }}
+          SITE: ${{ needs.deploy.outputs.site }}
+          BUCKET: ${{ needs.deploy.outputs.bucket }}
+          IMAGE_TAG: ${{ needs.deploy.outputs.image_tag }}
         run: |
           set -euo pipefail
           DATE_UTC=$(date -u '+%Y-%m-%d %H:%M:%S')
           OVERALL="$RESULT"
-          NEWLINE="Última execução do CD: ${DATE_UTC} UTC • ator: ${ACTOR} • branch: ${REF_NAME} • status: ${OVERALL} (run #${RUN_NUMBER})"
+          SITE_TXT=""; if [ -n "${SITE:-}" ]; then SITE_TXT=" • site: http://${SITE}"; fi
+          TAG_TXT=""; if [ -n "${IMAGE_TAG:-}" ]; then TAG_TXT=" • tag: ${IMAGE_TAG}"; fi
+          NEWLINE="Última execução do CD: ${DATE_UTC} UTC • ator: ${ACTOR} • branch: ${REF_NAME} • status: ${OVERALL}${TAG_TXT}${SITE_TXT} (run #${RUN_NUMBER})"
           awk -v repl="$NEWLINE" '
             BEGIN{inb=0}
             /<!-- cd-meta-start -->/{print; print repl; inb=1; next}
@@ -216,7 +230,8 @@ jobs:
             cancelled) COLOR="yellow" ;;
             *) COLOR="lightgrey" ;;
           esac
-          MESSAGE="${OVERALL} — ${DATE_UTC} UTC • ${ACTOR}"
+          SHORT_TAG=""; if [ -n "${IMAGE_TAG:-}" ]; then SHORT_TAG=" • tag:${IMAGE_TAG}"; fi
+          MESSAGE="${OVERALL} — ${DATE_UTC} UTC • ${ACTOR}${SHORT_TAG}"
           cat > .badges/cd-meta.json <<JSON
           {"schemaVersion":1,"label":"cd","message":"${MESSAGE}","color":"${COLOR}","cacheSeconds":60}
           JSON
@@ -231,6 +246,8 @@ jobs:
 
           git config user.email "ci-bot@example.com"
           git config user.name "CI Setup Bot"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git pull --rebase || true
           git add .badges/cd-meta.json README.md || true
           if [ "$CHANGED" -eq 1 ] || ! git diff --cached --quiet; then
             git commit -m "docs: update CD meta and badge [skip ci]" || echo "Nothing to commit"

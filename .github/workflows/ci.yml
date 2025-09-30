@@ -266,7 +266,7 @@ jobs:
       - frontend-test
       - frontend-build
       - summary
-    if: github.ref == 'refs/heads/main'
+    if: ${{ always() && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -275,6 +275,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: true
       - name: Update README meta block
         env:
           RUN_NUMBER: ${{ github.run_number }}
@@ -325,6 +327,8 @@ jobs:
 
           git config user.email "ci-bot@example.com"
           git config user.name "CI Setup Bot"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git pull --rebase || true
           git add .badges/ci-meta.json || true
           if [ "$CHANGED" -eq 1 ] || ! git diff --cached --quiet; then
             git commit -m "docs: update CI meta and badge [skip ci]" || echo "Nothing to commit"
