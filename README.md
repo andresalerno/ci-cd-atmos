@@ -3,10 +3,15 @@
 [![CI](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/ci.yml)
 [![CD](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/cd.yml/badge.svg?branch=main)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/cd.yml)
 [![CI Meta](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/andresalerno/ci-cd-atmos/main/.badges/ci-meta.json)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/ci.yml)
+[![CD Meta](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/andresalerno/ci-cd-atmos/main/.badges/cd-meta.json)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/cd.yml)
 
 <!-- ci-meta-start -->
 Última execução do CI: ainda não disponível
 <!-- ci-meta-end -->
+
+<!-- cd-meta-start -->
+Última execução do CD: ainda não disponível
+<!-- cd-meta-end -->
 
 Para histórico de builds (data, hora e status), use a aba `Actions` do GitHub. Cada execução lista timestamp, commit, autor, duração e conclusão. Este repo também publica:
 - Resumo por execução no “Workflow run summary” (rodapé do run)

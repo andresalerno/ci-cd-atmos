@@ -177,3 +177,64 @@ jobs:
       - name: Deployment summary
         run: |
           echo "Frontend (S3 website): http://${{ steps.tfout.outputs.site }}" >> $GITHUB_STEP_SUMMARY
+
+  cd-update-readme-meta:
+    needs:
+      - deploy
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - name: Update README CD meta and badge
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          ACTOR: ${{ github.actor }}
+          SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+          RESULT: ${{ needs.deploy.result }}
+        run: |
+          set -euo pipefail
+          DATE_UTC=$(date -u '+%Y-%m-%d %H:%M:%S')
+          OVERALL="$RESULT"
+          NEWLINE="Última execução do CD: ${DATE_UTC} UTC • ator: ${ACTOR} • branch: ${REF_NAME} • status: ${OVERALL} (run #${RUN_NUMBER})"
+          awk -v repl="$NEWLINE" '
+            BEGIN{inb=0}
+            /<!-- cd-meta-start -->/{print; print repl; inb=1; next}
+            /<!-- cd-meta-end -->/{inb=0}
+            !inb{print}
+          ' README.md > README.md.new
+
+          mkdir -p .badges
+          case "$OVERALL" in
+            success) COLOR="brightgreen" ;;
+            failure) COLOR="red" ;;
+            cancelled) COLOR="yellow" ;;
+            *) COLOR="lightgrey" ;;
+          esac
+          MESSAGE="${OVERALL} — ${DATE_UTC} UTC • ${ACTOR}"
+          cat > .badges/cd-meta.json <<JSON
+          {"schemaVersion":1,"label":"cd","message":"${MESSAGE}","color":"${COLOR}","cacheSeconds":60}
+          JSON
+
+          CHANGED=0
+          if ! cmp -s README.md README.md.new; then
+            mv README.md.new README.md
+            CHANGED=1
+          else
+            rm -f README.md.new
+          fi
+
+          git config user.email "ci-bot@example.com"
+          git config user.name "CI Setup Bot"
+          git add .badges/cd-meta.json README.md || true
+          if [ "$CHANGED" -eq 1 ] || ! git diff --cached --quiet; then
+            git commit -m "docs: update CD meta and badge [skip ci]" || echo "Nothing to commit"
+            git push
+          else
+            echo "No README or badge changes"
+          fi
