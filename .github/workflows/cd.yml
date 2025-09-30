@@ -44,6 +44,7 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID || '058264220517' }}
       ECR_REPO_BACKEND: ${{ secrets.ECR_REPO_BACKEND || 'devops-study-backend' }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
 
     steps:
       # Passo 1: Checkout do código-fonte
@@ -52,7 +53,7 @@ jobs:
 
       # Passo 2: Verificação dos secrets (somente quando NÃO usar OIDC)
       - name: Check access key secrets
-        if: ${{ !secrets.AWS_ROLE_ARN }}
+        if: ${{ env.AWS_ROLE_ARN == '' }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -74,17 +75,17 @@ jobs:
 
       # Passo 3A: Configura credenciais via OIDC (recomendado) quando houver AWS_ROLE_ARN
       - name: Configure AWS credentials (OIDC)
-        if: ${{ secrets.AWS_ROLE_ARN }}
+        if: ${{ env.AWS_ROLE_ARN != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           role-session-name: gha-cd
           aws-region: ${{ env.AWS_REGION }}
           mask-aws-account-id: true
 
       # Passo 3B: Configura credenciais via chaves de acesso (fallback)
       - name: Configure AWS credentials (access keys)
-        if: ${{ !secrets.AWS_ROLE_ARN }}
+        if: ${{ env.AWS_ROLE_ARN == '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
