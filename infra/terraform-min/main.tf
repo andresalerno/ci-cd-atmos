@@ -40,17 +40,23 @@ resource "aws_s3_bucket_public_access_block" "site" {
 }
 
 # Política para leitura pública do conteúdo
+resource "time_sleep" "wait_public_access_block" {
+  depends_on      = [aws_s3_bucket_public_access_block.site]
+  create_duration = "10s"
+}
+
 resource "aws_s3_bucket_policy" "public_read" {
-  bucket = aws_s3_bucket.site.id
-  policy = jsonencode({
-    Version = "2012-10-17",
+  bucket     = aws_s3_bucket.site.id
+  depends_on = [time_sleep.wait_public_access_block]
+  policy     = jsonencode({
+    Version   = "2012-10-17"
     Statement = [
       {
-        Sid: "PublicReadGetObject",
-        Effect: "Allow",
-        Principal: "*",
-        Action: ["s3:GetObject"],
-        Resource: ["${aws_s3_bucket.site.arn}/*"]
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = ["s3:GetObject"]
+        Resource  = ["${aws_s3_bucket.site.arn}/*"]
       }
     ]
   })
@@ -67,4 +73,3 @@ output "s3_website_endpoint" {
 output "region" {
   value = var.aws_region
 }
-
