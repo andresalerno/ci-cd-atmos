@@ -255,3 +255,80 @@ jobs:
             echo "- frontend-test: ${{ needs.frontend-test.result }}";
             echo "- frontend-build: ${{ needs.frontend-build.result }}";
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Atualiza o README com data/hora e ator da última execução do CI
+  update-readme-meta:
+    needs:
+      - backend-lint
+      - backend-test
+      - backend-build
+      - frontend-lint
+      - frontend-test
+      - frontend-build
+      - summary
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - name: Update README meta block
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          ACTOR: ${{ github.actor }}
+          SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+          RES_BACKEND_LINT: ${{ needs.backend-lint.result }}
+          RES_BACKEND_TEST: ${{ needs.backend-test.result }}
+          RES_BACKEND_BUILD: ${{ needs.backend-build.result }}
+          RES_FRONTEND_LINT: ${{ needs.frontend-lint.result }}
+          RES_FRONTEND_TEST: ${{ needs.frontend-test.result }}
+          RES_FRONTEND_BUILD: ${{ needs.frontend-build.result }}
+        run: |
+          set -euo pipefail
+          DATE_UTC=$(date -u '+%Y-%m-%d %H:%M:%S')
+          OVERALL="success"
+          for r in "$RES_BACKEND_LINT" "$RES_BACKEND_TEST" "$RES_BACKEND_BUILD" "$RES_FRONTEND_LINT" "$RES_FRONTEND_TEST" "$RES_FRONTEND_BUILD"; do
+            if [ "$r" != "success" ]; then OVERALL="$r"; break; fi
+          done
+          NEWLINE="Última execução do CI: ${DATE_UTC} UTC • ator: ${ACTOR} • branch: ${REF_NAME} • status: ${OVERALL} (run #${RUN_NUMBER})"
+          awk -v repl="$NEWLINE" '
+            BEGIN{inb=0}
+            /<!-- ci-meta-start -->/{print; print repl; inb=1; next}
+            /<!-- ci-meta-end -->/{inb=0}
+            !inb{print}
+          ' README.md > README.md.new
+
+          # Atualiza badge dinâmico (Shields endpoint) em .badges/ci-meta.json
+          mkdir -p .badges
+          case "$OVERALL" in
+            success) COLOR="brightgreen" ;;
+            failure) COLOR="red" ;;
+            cancelled) COLOR="yellow" ;;
+            *) COLOR="lightgrey" ;;
+          esac
+          MESSAGE="${OVERALL} — ${DATE_UTC} UTC • ${ACTOR}"
+          cat > .badges/ci-meta.json <<JSON
+{"schemaVersion":1,"label":"ci","message":"${MESSAGE}","color":"${COLOR}","cacheSeconds":60}
+JSON
+
+          if ! cmp -s README.md README.md.new; then
+            mv README.md.new README.md
+            CHANGED=1
+          else
+            rm -f README.md.new
+            CHANGED=0
+          fi
+
+          git config user.email "ci-bot@example.com"
+          git config user.name "CI Setup Bot"
+          git add .badges/ci-meta.json || true
+          if [ "$CHANGED" -eq 1 ] || ! git diff --cached --quiet; then
+            git commit -m "docs: update CI meta and badge [skip ci]" || echo "Nothing to commit"
+            git push
+          else
+            echo "No README or badge changes"
+          fi

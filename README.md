@@ -2,6 +2,11 @@
 
 [![CI](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/ci.yml)
 [![CD](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/cd.yml/badge.svg?branch=main)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/cd.yml)
+[![CI Meta](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/andresalerno/ci-cd-atmos/main/.badges/ci-meta.json)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/ci.yml)
+
+<!-- ci-meta-start -->
+Última execução do CI: ainda não disponível
+<!-- ci-meta-end -->
 
 Para histórico de builds (data, hora e status), use a aba `Actions` do GitHub. Cada execução lista timestamp, commit, autor, duração e conclusão. Este repo também publica:
 - Resumo por execução no “Workflow run summary” (rodapé do run)
@@ -23,6 +28,12 @@ Para histórico de builds (data, hora e status), use a aba `Actions` do GitHub. 
 No CI, os jobs de teste publicam automaticamente:
 - Relatórios JUnit: `backend/reports/**/*.xml`, `frontend/reports/**/*.xml`
 - Cobertura: `backend/coverage/**`, `frontend/coverage/**`
+
+### Badge dinâmico (Data/Hora/Ator)
+- O job `update-readme-meta` atualiza o arquivo `.badges/ci-meta.json` com payload para o Shields.io.
+- O README referencia: `https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/andresalerno/ci-cd-atmos/main/.badges/ci-meta.json`.
+- Cache reduzido: `cacheSeconds: 60` no JSON para refletir em até ~1 minuto.
+- Mostra status geral, timestamp UTC e ator da execução da última run em `main`.
 
 Executando localmente:
 - Backend: `cd backend && npm i && npm test`
