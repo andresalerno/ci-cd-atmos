@@ -248,12 +248,12 @@ jobs:
             echo "- Data (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')";
             echo "";
             echo "### Status dos Jobs";
-            echo "- backend-lint: ${{ needs.backend-lint.result }}";
-            echo "- backend-test: ${{ needs.backend-test.result }}";
-            echo "- backend-build: ${{ needs.backend-build.result }}";
-            echo "- frontend-lint: ${{ needs.frontend-lint.result }}";
-            echo "- frontend-test: ${{ needs.frontend-test.result }}";
-            echo "- frontend-build: ${{ needs.frontend-build.result }}";
+            echo "- backend-lint: ${{ needs['backend-lint'].result }}";
+            echo "- backend-test: ${{ needs['backend-test'].result }}";
+            echo "- backend-build: ${{ needs['backend-build'].result }}";
+            echo "- frontend-lint: ${{ needs['frontend-lint'].result }}";
+            echo "- frontend-test: ${{ needs['frontend-test'].result }}";
+            echo "- frontend-build: ${{ needs['frontend-build'].result }}";
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Atualiza o README com data/hora e ator da última execução do CI
@@ -281,12 +281,12 @@ jobs:
           ACTOR: ${{ github.actor }}
           SHA: ${{ github.sha }}
           REF_NAME: ${{ github.ref_name }}
-          RES_BACKEND_LINT: ${{ needs.backend-lint.result }}
-          RES_BACKEND_TEST: ${{ needs.backend-test.result }}
-          RES_BACKEND_BUILD: ${{ needs.backend-build.result }}
-          RES_FRONTEND_LINT: ${{ needs.frontend-lint.result }}
-          RES_FRONTEND_TEST: ${{ needs.frontend-test.result }}
-          RES_FRONTEND_BUILD: ${{ needs.frontend-build.result }}
+          RES_BACKEND_LINT: ${{ needs['backend-lint'].result }}
+          RES_BACKEND_TEST: ${{ needs['backend-test'].result }}
+          RES_BACKEND_BUILD: ${{ needs['backend-build'].result }}
+          RES_FRONTEND_LINT: ${{ needs['frontend-lint'].result }}
+          RES_FRONTEND_TEST: ${{ needs['frontend-test'].result }}
+          RES_FRONTEND_BUILD: ${{ needs['frontend-build'].result }}
         run: |
           set -euo pipefail
           DATE_UTC=$(date -u '+%Y-%m-%d %H:%M:%S')
@@ -312,8 +312,8 @@ jobs:
           esac
           MESSAGE="${OVERALL} — ${DATE_UTC} UTC • ${ACTOR}"
           cat > .badges/ci-meta.json <<JSON
-{"schemaVersion":1,"label":"ci","message":"${MESSAGE}","color":"${COLOR}","cacheSeconds":60}
-JSON
+          {"schemaVersion":1,"label":"ci","message":"${MESSAGE}","color":"${COLOR}","cacheSeconds":60}
+          JSON
 
           if ! cmp -s README.md README.md.new; then
             mv README.md.new README.md
