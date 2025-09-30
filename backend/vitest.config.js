@@ -1,15 +1,11 @@
+// Vitest config para backend Node (ESM)
+// - Habilita cobertura via V8 e gera relatórios em lcov/cobertura
+// - Adiciona reporter JUnit para exportar XML consumível pelo GitHub Actions
 import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
 
-// Config Vite + Vitest
-// - Adiciona seção de testes com reporter JUnit e cobertura v8
-// - Cobertura exporta formatos text/lcov/cobertura para o Actions coletar
 export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5173
-  },
   test: {
+    // Dois reporters: padrão + JUnit (salvo em reports/junit.xml)
     reporters: [
       'default',
       ['junit', { outputFile: 'reports/junit.xml' }]

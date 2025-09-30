@@ -1,5 +1,33 @@
 # Projeto DevOps: GitHub Actions + AWS (Node/React, PostgreSQL e Mongo)
 
+[![CI](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/ci.yml)
+[![CD](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/cd.yml/badge.svg?branch=main)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/cd.yml)
+
+Para histórico de builds (data, hora e status), use a aba `Actions` do GitHub. Cada execução lista timestamp, commit, autor, duração e conclusão. Este repo também publica:
+- Resumo por execução no “Workflow run summary” (rodapé do run)
+- Artefato do build do frontend (`frontend/dist`) para download
+- Artefato do backend (tar.gz com `src`, `package.json`, `Dockerfile`)
+- Test reports e coverage (se gerados pelos scripts) como artifacts
+
+## Testes e Cobertura (Vitest + JUnit)
+
+- Backend
+  - Config: `backend/vitest.config.js` — reporters `default` + `junit` (XML em `backend/reports/junit.xml`) e cobertura `v8` (`backend/coverage`).
+  - Scripts: `npm run test` executa Vitest com cobertura; `npm run lint` roda ESLint.
+  - Exemplo de teste: `backend/src/util.test.js`.
+- Frontend
+  - Config: `frontend/vite.config.js` inclui seção `test` do Vitest (reporter `junit`) e `coverage`.
+  - Scripts: `npm run test` executa Vitest com cobertura; `npm run lint` roda ESLint.
+  - Exemplo de teste: `frontend/src/util.test.js`.
+
+No CI, os jobs de teste publicam automaticamente:
+- Relatórios JUnit: `backend/reports/**/*.xml`, `frontend/reports/**/*.xml`
+- Cobertura: `backend/coverage/**`, `frontend/coverage/**`
+
+Executando localmente:
+- Backend: `cd backend && npm i && npm test`
+- Frontend: `cd frontend && npm i && npm test`
+
 Este repositório guia, passo a passo, a construção de um pipeline DevOps com GitHub Actions e AWS, usando:
 - Backend: Node.js (Express)
 - Frontend: React (Vite)
@@ -139,3 +167,12 @@ Pipeline de CD esperado:
 - [ ] Esqueleto de Terraform com providers, backend, variáveis e módulos.
 - [ ] Documentar Role OIDC (trust policy) e permissões mínimas.
 
+## CI
+
+- ...source code changes in a safe way (chaper 6)
+- ...starting with a commit until the point where we have a package that can be deployed in production
+- .. Agile practitioners know that a succesfull adoption cannot ignore the Agile engineering practices that directly affects the quality of the software being develop.
+- ...the first sign of a good and disciplined programmer is how they manage changes to the system's source code
+- Continues Delivery and DevOps require discipline and collaboration
+- The delivery process of a disciplined team alwas starts with a commit
+- Automation is one of the main pillars ofs DevOps and it is highlighted by several Agile engineering practices
