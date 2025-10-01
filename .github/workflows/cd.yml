@@ -162,7 +162,11 @@ jobs:
           if ! command -v jq >/dev/null 2>&1; then
             sudo apt-get update -y && sudo apt-get install -y jq
           fi
-          JSON="$(terraform -no-color output -json 2>/dev/null || true)"
+          # Capture any Terraform chatter, then strip everything before the first '{'
+          JSON_RAW="$(terraform -no-color output -json 2>&1 || true)"
+          JSON="$(printf '%s\n' "$JSON_RAW" | sed -n '/^{/,$p')"
+          # If still empty, use an empty object so jq doesn't fail
+          [ -n "$JSON" ] || JSON='{}'
           bucket="$(jq -r 'try .s3_bucket_name.value // empty' <<<"$JSON")"
           site="$(jq -r 'try .s3_website_endpoint.value // empty' <<<"$JSON")"
 
