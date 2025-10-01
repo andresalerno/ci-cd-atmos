@@ -153,8 +153,15 @@ jobs:
         id: tfout
         working-directory: infra/terraform-min
         run: |
-          echo "bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
-          echo "site=$(terraform output -raw s3_website_endpoint)" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          get() { terraform -no-color output -raw "$1" 2>/dev/null || true; }
+          bucket="$(get s3_bucket_name)"
+          site="$(get s3_website_endpoint)"
+
+          {
+            [ -n "$bucket" ] && echo "bucket=$bucket"
+            [ -n "$site" ] && echo "site=$site"
+          } >> "$GITHUB_OUTPUT"
 
       # Passo 10: Deploy ECS service (não aplicável)
       # Stack mínima: não há ECS neste pipeline
