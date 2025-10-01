@@ -154,9 +154,9 @@ jobs:
         working-directory: infra/terraform-min
         run: |
           set -euo pipefail
-          get() { terraform -no-color output -raw "$1" 2>/dev/null || true; }
-          bucket="$(get s3_bucket_name)"
-          site="$(get s3_website_endpoint)"
+          JSON="$(terraform -no-color output -json 2>/dev/null || true)"
+          bucket="$(jq -r 'try .s3_bucket_name.value // empty' <<<"$JSON")"
+          site="$(jq -r 'try .s3_website_endpoint.value // empty' <<<"$JSON")"
 
           {
             [ -n "$bucket" ] && echo "bucket=$bucket"
