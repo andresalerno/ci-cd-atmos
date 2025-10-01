@@ -135,6 +135,7 @@ jobs:
         working-directory: infra/terraform-min
         env:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_IN_AUTOMATION: true
         run: |
           # Inicializa o backend/provider e gera o plano de execução
           terraform init -input=false
@@ -146,12 +147,16 @@ jobs:
         working-directory: infra/terraform-min
         env:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_IN_AUTOMATION: true
         run: terraform apply -input=false -auto-approve tfplan
 
       # Passo 9: Lê outputs do Terraform (bucket e endpoint do site)
       - name: Read Terraform outputs (minimal)
         id: tfout
         working-directory: infra/terraform-min
+        continue-on-error: true
+        env:
+          TF_IN_AUTOMATION: true
         run: |
           set -euo pipefail
           JSON="$(terraform -no-color output -json 2>/dev/null || true)"
