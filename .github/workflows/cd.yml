@@ -159,16 +159,38 @@ jobs:
           TF_IN_AUTOMATION: true
         run: |
           set -euo pipefail
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update -y && sudo apt-get install -y jq
-          fi
-          # Capture any Terraform chatter, then strip everything before the first '{'
+          # Capture any Terraform chatter, then parse JSON using Python (no jq dependency)
           JSON_RAW="$(terraform -no-color output -json 2>&1 || true)"
-          JSON="$(printf '%s\n' "$JSON_RAW" | sed -n '/^{/,$p')"
-          # If still empty, use an empty object so jq doesn't fail
-          [ -n "$JSON" ] || JSON='{}'
-          bucket="$(jq -r 'try .s3_bucket_name.value // empty' <<<"$JSON")"
-          site="$(jq -r 'try .s3_website_endpoint.value // empty' <<<"$JSON")"
+
+          bucket="$(printf '%s\n' "$JSON_RAW" | python3 - <<'PY'
+import json, sys
+raw = sys.stdin.read()
+start = raw.find('{')
+obj = {}
+if start != -1:
+    try:
+        obj = json.loads(raw[start:])
+    except Exception:
+        obj = {}
+v = obj.get('s3_bucket_name', {})
+print(v.get('value', '') if isinstance(v, dict) else '')
+PY
+)"
+
+          site="$(printf '%s\n' "$JSON_RAW" | python3 - <<'PY'
+import json, sys
+raw = sys.stdin.read()
+start = raw.find('{')
+obj = {}
+if start != -1:
+    try:
+        obj = json.loads(raw[start:])
+    except Exception:
+        obj = {}
+v = obj.get('s3_website_endpoint', {})
+print(v.get('value', '') if isinstance(v, dict) else '')
+PY
+)"
 
           {
             [ -n "$bucket" ] && echo "bucket=$bucket"
