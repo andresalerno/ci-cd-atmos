@@ -190,7 +190,10 @@ jobs:
       # Passo 14: Resumo do deploy com link do site estático
       - name: Deployment summary
         run: |
-          echo "Frontend (S3 website): http://${{ steps.tfout.outputs.site }}" >> $GITHUB_STEP_SUMMARY
+          SITE="${{ steps.tfout.outputs.site }}"
+          if [ -n "$SITE" ]; then
+            echo "Frontend (S3 website): http://$SITE" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   cd-update-readme-meta:
     needs:
