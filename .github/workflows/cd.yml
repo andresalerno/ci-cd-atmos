@@ -197,7 +197,12 @@ jobs:
       # Passo 13: Publica artefatos do frontend no bucket S3 gerenciado pelo Terraform
       - name: Upload Frontend to S3
         run: |
-          aws s3 sync ./frontend/dist/ s3://${{ steps.tfout.outputs.bucket }} --delete
+          BUCKET="${{ steps.tfout.outputs.bucket }}"
+          if [ -z "$BUCKET" ]; then
+            echo "::notice::Skipping S3 upload: bucket output is empty (plan-only run or apply skipped)."
+            exit 0
+          fi
+          aws s3 sync ./frontend/dist/ "s3://$BUCKET" --delete
 
       # Passo 14: Resumo do deploy com link do site estático
       - name: Deployment summary
