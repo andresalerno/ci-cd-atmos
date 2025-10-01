@@ -159,6 +159,9 @@ jobs:
           TF_IN_AUTOMATION: true
         run: |
           set -euo pipefail
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y && sudo apt-get install -y jq
+          fi
           JSON="$(terraform -no-color output -json 2>/dev/null || true)"
           bucket="$(jq -r 'try .s3_bucket_name.value // empty' <<<"$JSON")"
           site="$(jq -r 'try .s3_website_endpoint.value // empty' <<<"$JSON")"
