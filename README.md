@@ -6,7 +6,7 @@
 [![CD Meta](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/andresalerno/ci-cd-atmos/main/.badges/cd-meta.json)](https://github.com/andresalerno/ci-cd-atmos/actions/workflows/cd.yml)
 
 <!-- ci-meta-start -->
-Última execução do CI: ainda não disponívell
+Última execução do CI: ainda não disponível
 <!-- ci-meta-end -->
 
 <!-- cd-meta-start -->
