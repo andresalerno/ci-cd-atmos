@@ -115,18 +115,6 @@ jobs:
           aws ecr describe-repositories --repository-names "$ECR_REPO_BACKEND" >/dev/null 2>&1 \
             || aws ecr create-repository --repository-name "$ECR_REPO_BACKEND"
 
-      # Passo 6: Build & Push do backend para o ECR
-      - name: Build & Push Backend to ECR
-        id: build_push
-        run: |
-          # Define repositório e tag (usa a tag de git quando existir, senão 'latest')
-          IMAGE_REPO="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_BACKEND"
-          IMAGE_TAG="${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}"
-          docker build -t "$IMAGE_REPO:latest" -t "$IMAGE_REPO:$IMAGE_TAG" ./backend
-          docker push "$IMAGE_REPO:latest"
-          docker push "$IMAGE_REPO:$IMAGE_TAG"
-          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
-
       # Passo 7: Setup do Terraform (stack mínima; sem criar novos roles IAM)
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -137,18 +125,23 @@ jobs:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
           TF_IN_AUTOMATION: true
         run: |
-          # Inicializa o backend/provider e gera o plano de execução
           terraform init -input=false
           terraform plan -input=false -out=tfplan
 
       # Passo 8: Aplica o plano do Terraform quando em tag, push na main ou execução manual com apply=true
       - name: Terraform Apply (minimal)
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.apply == true) || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
         working-directory: infra/terraform-min
         env:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
           TF_IN_AUTOMATION: true
-        run: terraform apply -input=false -auto-approve tfplan
+        run: |
+          set -euo pipefail
+          if [ -f tfplan ]; then
+            terraform apply -input=false -auto-approve tfplan
+          else
+            terraform apply -input=false -auto-approve
+          fi
 
       # Passo 9: Lê outputs do Terraform (bucket e endpoint do site)
       - name: Read Terraform outputs (minimal)
@@ -158,57 +151,24 @@ jobs:
         env:
           TF_IN_AUTOMATION: true
         run: |
-          set -euo pipefail
-          # Capture any Terraform chatter, then parse JSON using Python (no jq dependency)
-          JSON_RAW="$(terraform -no-color output -json 2>&1 || true)"
+          bucket="$(terraform -no-color output -raw s3_bucket_name 2>/dev/null || true)"
+          site="$(terraform -no-color output -raw s3_website_endpoint 2>/dev/null || true)"
+          if [ -n "$bucket" ]; then
+            echo "bucket=$bucket" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$site" ]; then
+            echo "site=$site" >> "$GITHUB_OUTPUT"
+          fi
 
-          bucket="$(printf '%s\n' "$JSON_RAW" | python3 - <<'PY'
-import json, sys
-raw = sys.stdin.read()
-start = raw.find('{')
-obj = {}
-if start != -1:
-    try:
-        obj = json.loads(raw[start:])
-    except Exception:
-        obj = {}
-v = obj.get('s3_bucket_name', {})
-print(v.get('value', '') if isinstance(v, dict) else '')
-PY
-)"
-
-          site="$(printf '%s\n' "$JSON_RAW" | python3 - <<'PY'
-import json, sys
-raw = sys.stdin.read()
-start = raw.find('{')
-obj = {}
-if start != -1:
-    try:
-        obj = json.loads(raw[start:])
-    except Exception:
-        obj = {}
-v = obj.get('s3_website_endpoint', {})
-print(v.get('value', '') if isinstance(v, dict) else '')
-PY
-)"
-
-          {
-            [ -n "$bucket" ] && echo "bucket=$bucket"
-            [ -n "$site" ] && echo "site=$site"
-          } >> "$GITHUB_OUTPUT"
-
-      # Passo 10: Deploy ECS service (não aplicável)
-      # Stack mínima: não há ECS neste pipeline
-
-      # Passo 11: Setup do Node.js para build do frontend
+      # Passo 10: Setup do Node.js para build do frontend
       - name: Setup Node (frontend build)
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
-          cache-dependency-path: frontend/package.json
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      # Passo 12: Build do frontend
+      # Passo 11: Build do frontend
       - name: Build frontend
         working-directory: frontend
         run: |
@@ -218,9 +178,10 @@ PY
 
       # Passo 13: Publica artefatos do frontend no bucket S3 gerenciado pelo Terraform
       - name: Upload Frontend to S3
+        env:
+          BUCKET: ${{ steps.tfout.outputs.bucket }}
         run: |
-          BUCKET="${{ steps.tfout.outputs.bucket }}"
-          if [ -z "$BUCKET" ]; then
+          if [ -z "${BUCKET:-}" ]; then
             echo "::notice::Skipping S3 upload: bucket output is empty (plan-only run or apply skipped)."
             exit 0
           fi
@@ -230,7 +191,7 @@ PY
       - name: Deployment summary
         run: |
           SITE="${{ steps.tfout.outputs.site }}"
-          if [ -n "$SITE" ]; then
+          if [ -n "${SITE:-}" ]; then
             echo "Frontend (S3 website): http://$SITE" >> "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -281,9 +242,7 @@ PY
           esac
           SHORT_TAG=""; if [ -n "${IMAGE_TAG:-}" ]; then SHORT_TAG=" • tag:${IMAGE_TAG}"; fi
           MESSAGE="${OVERALL} — ${DATE_UTC} UTC • ${ACTOR}${SHORT_TAG}"
-          cat > .badges/cd-meta.json <<JSON
-          {"schemaVersion":1,"label":"cd","message":"${MESSAGE}","color":"${COLOR}","cacheSeconds":60}
-          JSON
+          printf '%s' '{"schemaVersion":1,"label":"cd","message":"'"${MESSAGE}"'","color":"'"${COLOR}"'","cacheSeconds":60}' > .badges/cd-meta.json
 
           CHANGED=0
           if ! cmp -s README.md README.md.new; then
