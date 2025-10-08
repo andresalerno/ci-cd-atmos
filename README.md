@@ -10,7 +10,7 @@
 <!-- ci-meta-end -->
 
 <!-- cd-meta-start -->
-Última execução do CD: 2025-10-01 12:17:50 UTC • ator: andresalerno • branch: main • status: failure • tag: latest (run #33)
+Última execução do CD: 2025-10-01 12:26:23 UTC • ator: andresalerno • branch: main • status: success • tag: latest (run #34)
 <!-- cd-meta-end -->
 
 Para histórico de builds (data, hora e status), use a aba `Actions` do GitHub. Cada execução lista timestamp, commit, autor, duração e conclusão. Este repo também publica:
