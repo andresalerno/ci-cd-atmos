@@ -22,6 +22,7 @@ const getMongoClient = async () => {
     mongoClient = new MongoClient(uri);
     await mongoClient.connect();
   }
+  console.log("ehehehe")
   return mongoClient;
 };
 
