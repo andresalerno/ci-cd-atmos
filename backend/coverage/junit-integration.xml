@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="3" failures="2" errors="0" time="0.616">
+    <testsuite name="src/index.integration.test.js" timestamp="2025-11-04T13:59:22.441Z" hostname="LAPTOP-SCCO8TTH" tests="3" failures="2" errors="0" skipped="0" time="0.046">
+        <testcase classname="src/index.integration.test.js" name="integration: /health &gt; returns ok when both Postgres and Mongo are healthy" time="0.035">
+            <system-out>
+Backend listening on port 3000
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/index.integration.test.js" name="integration: /health &gt; returns error when Postgres query fails" time="0.01">
+            <failure message="Health handler was not registered by app (expected /health)" type="Error">
+Error: Health handler was not registered by app (expected /health)
+ ❯ src/index.integration.test.js:97:13
+            </failure>
+        </testcase>
+        <testcase classname="src/index.integration.test.js" name="integration: /health &gt; returns error when Mongo ping fails" time="0.001">
+            <failure message="Health handler was not registered by app (expected /health)" type="Error">
+Error: Health handler was not registered by app (expected /health)
+ ❯ src/index.integration.test.js:97:13
+            </failure>
+        </testcase>
+    </testsuite>
+</testsuites>

@@ -8,7 +8,9 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "lint": "eslint . --max-warnings=0",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "test:unit": "vitest --config vitest.unit.config.js --run",
+    "test:integration": "vitest --config vitest.integration.config.js --run"
   },
   "dependencies": {
     "express": "^4.19.2",
