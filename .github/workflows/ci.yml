@@ -3,11 +3,7 @@ name: CI Pipeline (Lint, Test, Build)
 on:
   # Gatilho para o CI rodar quando houver push ou pull request para a branch main
   push:
-    branches:
-      - main  # Executa quando há push para a branch principal (main)
   pull_request:
-    branches:
-      - main  # Executa quando há pull request para a branch principal (main)
   # Permite disparar manualmente pelo UI do GitHub
   workflow_dispatch:
 
