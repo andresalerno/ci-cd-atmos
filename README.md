@@ -10,7 +10,7 @@
 <!-- ci-meta-end -->
 
 <!-- cd-meta-start -->
-Última execução do CD: 2025-11-05 02:09:36 UTC • ator: karengoncalves8 • branch: main • status: failure (run #40)
+Última execução do CD: 2025-11-05 02:16:03 UTC • ator: karengoncalves8 • branch: main • status: failure (run #41)
 <!-- cd-meta-end -->
 
 Para histórico de builds (data, hora e status), use a aba `Actions` do GitHub. Cada execução lista timestamp, commit, autor, duração e conclusão. Este repo também publica:
