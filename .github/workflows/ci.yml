@@ -41,12 +41,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
-  # Job de Testes para o Backend
-  backend-test:
+  # Unit tests para o Backend
+  backend-unit-test:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend  # Define o diretório de trabalho como 'backend'
+        working-directory: backend
 
     steps:
       - uses: actions/checkout@v4
@@ -62,24 +62,65 @@ jobs:
         run: |
           if [ -f package-lock.json ]; then npm ci || npm i --no-audit --no-fund; else npm i --no-audit --no-fund; fi
 
-      # Passo 2: Rodar os testes
-      - name: Test
-        run: npm test
+      - name: Unit Test
+        run: npm run test:unit
 
-      - name: Upload backend test reports (JUnit)
+      - name: Upload backend unit test reports (JUnit)
         uses: actions/upload-artifact@v4
         with:
-          name: backend-tests-junit-${{ github.run_number }}
+          name: backend-unit-tests-junit-${{ github.run_number }}
           path: |
             backend/reports/**/*.xml
             backend/test-results/**/*.xml
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Upload backend coverage
+      - name: Upload backend unit coverage
         uses: actions/upload-artifact@v4
         with:
-          name: backend-coverage-${{ github.run_number }}
+          name: backend-unit-coverage-${{ github.run_number }}
+          path: backend/coverage/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Integration tests para o Backend
+  backend-integration-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout code
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: backend/package.json
+
+      - name: Install
+        run: |
+          if [ -f package-lock.json ]; then npm ci || npm i --no-audit --no-fund; else npm i --no-audit --no-fund; fi
+
+      - name: Integration Test
+        run: npm run test:integration
+
+      - name: Upload backend integration test reports (JUnit)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-tests-junit-${{ github.run_number }}
+          path: |
+            backend/reports/**/*.xml
+            backend/test-results/**/*.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload backend integration coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-coverage-${{ github.run_number }}
           path: backend/coverage/**
           if-no-files-found: ignore
           retention-days: 14
@@ -228,7 +269,8 @@ jobs:
   summary:
     needs:
       - backend-lint
-      - backend-test
+      - backend-unit-test
+      - backend-integration-test
       - backend-build
       - frontend-lint
       - frontend-test
@@ -249,7 +291,8 @@ jobs:
             echo "";
             echo "### Status dos Jobs";
             echo "- backend-lint: ${{ needs['backend-lint'].result }}";
-            echo "- backend-test: ${{ needs['backend-test'].result }}";
+            echo "- backend-unit-test: ${{ needs['backend-unit-test'].result }}";
+            echo "- backend-integration-test: ${{ needs['backend-integration-test'].result }}";
             echo "- backend-build: ${{ needs['backend-build'].result }}";
             echo "- frontend-lint: ${{ needs['frontend-lint'].result }}";
             echo "- frontend-test: ${{ needs['frontend-test'].result }}";
@@ -260,7 +303,8 @@ jobs:
   update-readme-meta:
     needs:
       - backend-lint
-      - backend-test
+      - backend-unit-test
+      - backend-integration-test
       - backend-build
       - frontend-lint
       - frontend-test
@@ -284,7 +328,8 @@ jobs:
           SHA: ${{ github.sha }}
           REF_NAME: ${{ github.ref_name }}
           RES_BACKEND_LINT: ${{ needs['backend-lint'].result }}
-          RES_BACKEND_TEST: ${{ needs['backend-test'].result }}
+          RES_BACKEND_UNIT_TEST: ${{ needs['backend-unit-test'].result }}
+          RES_BACKEND_INTEGRATION_TEST: ${{ needs['backend-integration-test'].result }}
           RES_BACKEND_BUILD: ${{ needs['backend-build'].result }}
           RES_FRONTEND_LINT: ${{ needs['frontend-lint'].result }}
           RES_FRONTEND_TEST: ${{ needs['frontend-test'].result }}
@@ -293,7 +338,7 @@ jobs:
           set -euo pipefail
           DATE_UTC=$(date -u '+%Y-%m-%d %H:%M:%S')
           OVERALL="success"
-          for r in "$RES_BACKEND_LINT" "$RES_BACKEND_TEST" "$RES_BACKEND_BUILD" "$RES_FRONTEND_LINT" "$RES_FRONTEND_TEST" "$RES_FRONTEND_BUILD"; do
+          for r in "$RES_BACKEND_LINT" "$RES_BACKEND_UNIT_TEST" "$RES_BACKEND_INTEGRATION_TEST" "$RES_BACKEND_BUILD" "$RES_FRONTEND_LINT" "$RES_FRONTEND_TEST" "$RES_FRONTEND_BUILD"; do
             if [ "$r" != "success" ]; then OVERALL="$r"; break; fi
           done
           NEWLINE="Última execução do CI: ${DATE_UTC} UTC • ator: ${ACTOR} • branch: ${REF_NAME} • status: ${OVERALL} (run #${RUN_NUMBER})"
