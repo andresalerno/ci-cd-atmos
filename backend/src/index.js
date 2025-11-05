@@ -21,6 +21,7 @@ const getMongoClient = async () => {
     const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/appdb';
     mongoClient = new MongoClient(uri);
     await mongoClient.connect();
+    console.log('Connected to MongoDB');
   }
   return mongoClient;
 };
